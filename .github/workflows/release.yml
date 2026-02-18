@@ -97,75 +97,72 @@ jobs:
             dist/*.sha256
           generate_release_notes: true
 
-  # update-homebrew:
-  #   name: Update Homebrew formula
-  #   needs: release
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Download macOS artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         path: dist
-  #         merge-multiple: true
+  update-homebrew:
+    name: Update Homebrew formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: Compute version tag
-  #       run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
-  #     - name: Read SHA256s
-  #       run: |
-  #         echo "SHA256_ARM=$(cat dist/portless-aarch64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
-  #         echo "SHA256_X64=$(cat dist/portless-x86_64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
+      - name: Compute version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
-  #     - name: Checkout homebrew tap
-  #       uses: actions/checkout@v4
-  #       with:
-  #         repository: lusons/homebrew-portless
-  #         token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-  #         path: homebrew-tap
+      - name: Read SHA256s
+        run: |
+          echo "SHA256_ARM=$(cat dist/portless-aarch64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
+          echo "SHA256_X64=$(cat dist/portless-x86_64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
 
-  #     - name: Update formula
-  #       run: |
-  #         TAG=${{ github.ref_name }}
-  #         VERSION=${{ env.VERSION }}
-  #         SHA256_ARM=${{ env.SHA256_ARM }}
-  #         SHA256_X64=${{ env.SHA256_X64 }}
-  #         BASE_URL="https://github.com/lusons/portless-rs/releases/download/${TAG}"
+      - name: Update formula
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION=${{ env.VERSION }}
+          SHA256_ARM=${{ env.SHA256_ARM }}
+          SHA256_X64=${{ env.SHA256_X64 }}
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
 
-  #         cat > homebrew-tap/Formula/portless.rb << EOF
-  #         class Portless < Formula
-  #           desc "Replace port numbers with stable .localhost URLs for local development"
-  #           homepage "https://github.com/lusons/portless-rs"
-  #           version "${VERSION}"
-  #           license "MIT"
+          cat > Formula/portless.rb << EOF
+          class Portless < Formula
+            desc "Replace port numbers with stable .localhost URLs for local development"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${VERSION}"
+            license "MIT"
 
-  #           on_macos do
-  #             if Hardware::CPU.arm?
-  #               url "${BASE_URL}/portless-aarch64-apple-darwin.tar.gz"
-  #               sha256 "${SHA256_ARM}"
-  #             else
-  #               url "${BASE_URL}/portless-x86_64-apple-darwin.tar.gz"
-  #               sha256 "${SHA256_X64}"
-  #             end
-  #           end
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/portless-aarch64-apple-darwin.tar.gz"
+                sha256 "${SHA256_ARM}"
+              else
+                url "${BASE_URL}/portless-x86_64-apple-darwin.tar.gz"
+                sha256 "${SHA256_X64}"
+              end
+            end
 
-  #           def install
-  #             bin.install "portless"
-  #           end
+            def install
+              bin.install "portless"
+            end
 
-  #           test do
-  #             assert_match "portless", shell_output("#{bin}/portless --help")
-  #           end
-  #         end
-  #         EOF
+            test do
+              assert_match "portless", shell_output("#{bin}/portless --help")
+            end
+          end
+          EOF
 
-  #     - name: Commit and push formula update
-  #       working-directory: homebrew-tap
-  #       run: |
-  #         git config user.name "github-actions[bot]"
-  #         git config user.email "github-actions[bot]@users.noreply.github.com"
-  #         git add Formula/portless.rb
-  #         git commit -m "portless ${{ env.VERSION }}"
-  #         git push
+      - name: Commit and push formula update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/portless.rb
+          git diff --cached --quiet || git commit -m "chore: update homebrew formula to ${{ env.VERSION }}"
+          git push
 
   # publish-crates:
   #   name: Publish to crates.io
