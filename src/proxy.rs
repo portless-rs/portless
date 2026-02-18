@@ -110,7 +110,7 @@ async fn handle_http(
     port: u16,
     remote_addr: SocketAddr,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
-    let stream = match TcpStream::connect(("127.0.0.1", port)).await {
+    let stream = match connect_to_backend(port).await {
         Ok(s) => s,
         Err(_) => return Ok(bad_gateway_response()),
     };
@@ -128,6 +128,13 @@ async fn handle_http(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
+
+    // Rewrite Host to localhost:<port> so backends like Vite accept the request
+    parts.headers.insert(
+        "host",
+        HeaderValue::from_str(&format!("localhost:{}", port))
+            .unwrap_or_else(|_| HeaderValue::from_static("localhost")),
+    );
 
     // X-Forwarded-For: append (chain) existing value
     let xff = parts
@@ -207,7 +214,13 @@ async fn handle_websocket(
 
     // Build raw HTTP request to send to backend
     let mut req_str = format!("{} {} HTTP/1.1\r\n", method, uri_path);
+    // Rewrite Host to localhost:<port> so backends like Vite accept the request;
+    // skip the original Host header from the client.
+    req_str.push_str(&format!("host: localhost:{}\r\n", port));
     for (name, value) in req.headers() {
+        if name == "host" {
+            continue;
+        }
         if let Ok(v) = value.to_str() {
             req_str.push_str(&format!("{}: {}\r\n", name, v));
         }
@@ -228,7 +241,7 @@ async fn handle_websocket(
     }
     req_str.push_str("\r\n");
 
-    let mut backend = match TcpStream::connect(("127.0.0.1", port)).await {
+    let mut backend = match connect_to_backend(port).await {
         Ok(s) => s,
         Err(_) => return Ok(bad_gateway_response()),
     };
@@ -403,4 +416,14 @@ fn bad_gateway_response() -> Response<BoxBody<Bytes, hyper::Error>> {
 
 fn empty_body() -> BoxBody<Bytes, hyper::Error> {
     Empty::<Bytes>::new().map_err(|e| match e {}).boxed()
+}
+
+/// Connect to a local backend port, trying IPv4 first then IPv6.
+/// Node.js 18+ on macOS resolves `localhost` to ::1 (IPv6) by default,
+/// so hardcoding 127.0.0.1 fails when the backend only binds to ::1.
+async fn connect_to_backend(port: u16) -> std::io::Result<TcpStream> {
+    if let Ok(s) = TcpStream::connect(("127.0.0.1", port)).await {
+        return Ok(s);
+    }
+    TcpStream::connect(("::1", port)).await
 }

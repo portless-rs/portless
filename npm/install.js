@@ -22,7 +22,6 @@ function getPlatformTarget() {
 
   throw new Error(
     `Unsupported platform: ${platform} ${arch}.\n` +
-    `Please install portless via cargo: cargo install portless\n` +
     `Or download manually from: https://github.com/${REPO}/releases`
   );
 }

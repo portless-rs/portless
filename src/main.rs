@@ -184,7 +184,7 @@ async fn cmd_proxy_start(port: u16, state_dir: PathBuf, foreground: bool) -> Res
     if foreground {
         println!(
             "{}",
-            "\nportless proxy\n".to_string().bold().blue()
+            format!("\nportless proxy v{}\n", env!("CARGO_PKG_VERSION")).bold().blue()
         );
         proxy::run_proxy(port, state_dir).await
     } else {
@@ -376,7 +376,7 @@ async fn cmd_run(
     let hostname = parse_hostname(&name)?;
     let app_url = format_url(&hostname, proxy_port);
 
-    println!("{}", "\nportless\n".bold().blue());
+    println!("{}", format!("\nportless v{}\n", env!("CARGO_PKG_VERSION")).bold().blue());
     println!("{}", format!("-- {} (auto-resolves to 127.0.0.1)", hostname).dimmed());
 
     // Auto-start proxy if not running

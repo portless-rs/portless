@@ -37,10 +37,11 @@ brew install portless
 npm install -g portless-rs
 ```
 
-**cargo:**
+**Local build (for testing):**
 
 ```bash
-cargo install portless
+cargo build --release
+export PATH="/Users/lusons/Documents/workspace/portless-rs/target/release:$PATH"
 ```
 
 ## Usage
@@ -57,7 +58,6 @@ portless <name> <command...>
 
 ```bash
 portless myapp npm run dev
-portless api cargo run
 portless backend python manage.py runserver $PORT
 ```
 
@@ -92,6 +92,35 @@ portless proxy stop
 # Run in the foreground (useful for debugging)
 portless proxy start --foreground
 ```
+
+## Framework examples
+
+### Vite
+
+Configure Vite to read the port from the `PORT` environment variable that portless injects:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  server: {
+    host: '0.0.0.0',
+    port: Number(process.env.PORT) || 5173,
+    strictPort: true,
+  },
+})
+```
+
+Then start your app with portless:
+
+```bash
+portless myapp npx vite
+```
+
+Your Vite dev server (including HMR) is now available at `http://myapp.localhost:1355`.
+
+> `host: '0.0.0.0'` is required so that Vite listens on all interfaces and the proxy can reach it. `strictPort: true` prevents Vite from silently picking a different port if the one portless assigned happens to be taken.
 
 ## Proxy port
 
