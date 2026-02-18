@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: portless-aarch64-apple-darwin.tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: portless-x86_64-apple-darwin.tar.gz
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: portless-x86_64-unknown-linux-gnu.tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: portless-aarch64-unknown-linux-gnu.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross (Linux cross-compilation)
+        if: runner.os == 'Linux'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build (macOS native)
+        if: runner.os == 'macOS'
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (Linux via cross)
+        if: runner.os == 'Linux'
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          BINARY=portless
+          TARGET=${{ matrix.target }}
+          ARCHIVE=${{ matrix.archive }}
+          mkdir -p dist
+          cp target/$TARGET/release/$BINARY dist/$BINARY
+          tar -czf dist/$ARCHIVE -C dist $BINARY
+          echo "ARCHIVE_PATH=dist/$ARCHIVE" >> $GITHUB_ENV
+
+      - name: Compute SHA256
+        shell: bash
+        run: |
+          sha256sum dist/${{ matrix.archive }} | awk '{print $1}' > dist/${{ matrix.archive }}.sha256
+          echo "SHA256=$(cat dist/${{ matrix.archive }}.sha256)" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: |
+            dist/${{ matrix.archive }}
+            dist/${{ matrix.archive }}.sha256
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          generate_release_notes: true
+
+  update-homebrew:
+    name: Update Homebrew formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Compute version tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Read SHA256s
+        run: |
+          echo "SHA256_ARM=$(cat dist/portless-aarch64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
+          echo "SHA256_X64=$(cat dist/portless-x86_64-apple-darwin.tar.gz.sha256)" >> $GITHUB_ENV
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: lusons/homebrew-portless
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION=${{ env.VERSION }}
+          SHA256_ARM=${{ env.SHA256_ARM }}
+          SHA256_X64=${{ env.SHA256_X64 }}
+          BASE_URL="https://github.com/lusons/portless-rs/releases/download/${TAG}"
+
+          cat > homebrew-tap/Formula/portless.rb << EOF
+          class Portless < Formula
+            desc "Replace port numbers with stable .localhost URLs for local development"
+            homepage "https://github.com/lusons/portless-rs"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/portless-aarch64-apple-darwin.tar.gz"
+                sha256 "${SHA256_ARM}"
+              else
+                url "${BASE_URL}/portless-x86_64-apple-darwin.tar.gz"
+                sha256 "${SHA256_X64}"
+              end
+            end
+
+            def install
+              bin.install "portless"
+            end
+
+            test do
+              assert_match "portless", shell_output("#{bin}/portless --help")
+            end
+          end
+          EOF
+
+      - name: Commit and push formula update
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/portless.rb
+          git commit -m "portless ${{ env.VERSION }}"
+          git push
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Set version in package.json
+        working-directory: npm
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+      - name: Publish
+        working-directory: npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PORTLESS_RS_TOKEN }}

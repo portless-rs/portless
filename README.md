@@ -24,6 +24,21 @@ Routes are stored in a JSON file (`~/.portless/routes.json`) and cleaned up auto
 
 ## Installation
 
+**Homebrew (macOS):**
+
+```bash
+brew tap lusons/portless
+brew install portless
+```
+
+**npm:**
+
+```bash
+npm install -g portless-rs
+```
+
+**cargo:**
+
 ```bash
 cargo install portless
 ```
