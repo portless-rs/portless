@@ -1,6 +1,8 @@
 # portless
 
-Replace port numbers with stable `.localhost` URLs for local development — built with Rust, only 1MB.
+> A Rust port of [vercel-labs/portless](https://github.com/vercel-labs/portless) — built with Rust, only 1MB.
+
+Replace port numbers with stable `.localhost` URLs for local development.
 
 Instead of juggling `localhost:3000`, `localhost:8080`, etc., **portless** gives each app a clean, memorable URL:
 
