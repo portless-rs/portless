@@ -81,8 +81,12 @@ async function main() {
     // Clean up partial download
     if (fs.existsSync(tmpArchive)) fs.unlinkSync(tmpArchive);
     console.error(`\nFailed to install portless: ${err.message}`);
-    console.error(`You can install manually via cargo: cargo install portless`);
-    console.error(`Or download from: https://github.com/${REPO}/releases/tag/v${version}`);
+    if (err.message.includes("404")) {
+      console.error(`\nThe GitHub release v${version} may not exist or has no prebuilt binary for ${target}.`);
+      console.error(`Either wait for a new release or install from source:`);
+    }
+    console.error(`  cargo install portless`);
+    console.error(`Or download from: https://github.com/${REPO}/releases`);
     process.exit(1);
   }
 }
