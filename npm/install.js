@@ -5,10 +5,9 @@
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const zlib = require("zlib");
 const { execSync } = require("child_process");
 
-const REPO = "lusons/portless-rs";
+const REPO = "portless-rs/portless";
 const BIN_DIR = path.join(__dirname, "bin");
 const BIN_PATH = path.join(BIN_DIR, "portless");
 
@@ -62,7 +61,6 @@ async function main() {
   const target = getPlatformTarget();
   const version = getVersion();
   const archiveName = `portless-${target}.tar.gz`;
-  const url = `https://github.com/${REPO}/releases/download/v${version}/${archiveName}`;
   const tmpArchive = path.join(BIN_DIR, archiveName);
 
   console.log(`Installing portless v${version} for ${target}...`);
@@ -72,6 +70,7 @@ async function main() {
   }
 
   try {
+    const url = `https://github.com/${REPO}/releases/download/v${version}/${archiveName}`;
     await download(url, tmpArchive);
     extractTarGz(tmpArchive, BIN_DIR);
     fs.unlinkSync(tmpArchive);
