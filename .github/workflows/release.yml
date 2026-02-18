@@ -127,14 +127,18 @@ jobs:
           VERSION=${{ env.VERSION }}
           SHA256_ARM=${{ env.SHA256_ARM }}
           SHA256_X64=${{ env.SHA256_X64 }}
-          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
-          sed \
-            -e "s|PLACEHOLDER_VERSION|${VERSION}|g" \
-            -e "s|PLACEHOLDER_BASE_URL|${BASE_URL}|g" \
-            -e "s|PLACEHOLDER_ARM64_SHA256|${SHA256_ARM}|g" \
-            -e "s|PLACEHOLDER_X86_64_SHA256|${SHA256_X64}|g" \
-            Formula/portless.rb > Formula/portless.rb.tmp
-          mv Formula/portless.rb.tmp Formula/portless.rb
+          sed -i \
+            -e "s|version \"[^\"]*\"|version \"${VERSION}\"|" \
+            -e "s|releases/download/[^/]*/portless-aarch64|releases/download/${TAG}/portless-aarch64|" \
+            -e "s|releases/download/[^/]*/portless-x86_64|releases/download/${TAG}/portless-x86_64|" \
+            Formula/portless.rb
+          # Replace sha256 values by line number to avoid ambiguity
+          ARM_LINE=$(grep -n "aarch64-apple-darwin.tar.gz" Formula/portless.rb | head -1 | cut -d: -f1)
+          X64_LINE=$(grep -n "x86_64-apple-darwin.tar.gz" Formula/portless.rb | head -1 | cut -d: -f1)
+          SHA_ARM_LINE=$((ARM_LINE + 1))
+          SHA_X64_LINE=$((X64_LINE + 1))
+          sed -i "${SHA_ARM_LINE}s|sha256 \"[a-f0-9]*\"|sha256 \"${SHA256_ARM}\"|" Formula/portless.rb
+          sed -i "${SHA_X64_LINE}s|sha256 \"[a-f0-9]*\"|sha256 \"${SHA256_X64}\"|" Formula/portless.rb
 
       - name: Commit and push formula update
         run: |
