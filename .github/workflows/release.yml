@@ -95,7 +95,6 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.sha256
-          generate_release_notes: true
 
   update-homebrew:
     name: Update Homebrew formula
