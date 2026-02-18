@@ -9,39 +9,92 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::watch;
+use tokio::time::{Duration, Instant};
 
 use crate::routes::RouteStore;
 use crate::types::Route;
 use crate::utils::escape_html;
 
+/// After all routes disappear, wait this long before shutting down.
+const IDLE_SHUTDOWN_DELAY: Duration = Duration::from_secs(5);
+/// Grace period after startup before idle-shutdown is armed (lets the first app register).
+const IDLE_GRACE: Duration = Duration::from_secs(10);
+/// How often the route-reloader re-reads routes.json.
+const ROUTE_RELOAD_INTERVAL: Duration = Duration::from_millis(100);
+
 pub async fn run_proxy(port: u16, state_dir: PathBuf) -> Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await?;
+
+    // Write PID file so `portless proxy stop` and `shutdown_proxy_if_idle` can find us.
+    let pid_path = state_dir.join("proxy.pid");
+    let port_path = state_dir.join("proxy.port");
+    let my_pid = std::process::id();
+    let _ = std::fs::write(&pid_path, my_pid.to_string());
+    let _ = std::fs::write(&port_path, port.to_string());
+
     eprintln!("portless proxy listening on port {}", port);
 
-    // Cache routes in memory; reload from disk on each request (simple approach).
-    // For higher fidelity with the original we share a cached Arc<RwLock> and
-    // spawn a background task that watches the file.
+    // `has_routes` is true while at least one live-PID route exists.
+    // The route-reloader writes to this channel; the idle-shutdown task reads from it.
+    let (routes_tx, mut routes_rx) = watch::channel(true);
+
     let store = RouteStore::new(state_dir.clone())?;
     let cached_routes: Arc<RwLock<Vec<Route>>> = Arc::new(RwLock::new(
         store.load_raw().unwrap_or_default(),
     ));
 
-    // Background route-reloader: polls every 100 ms (debounce equivalent).
+    // Background route-reloader: re-reads routes.json every ROUTE_RELOAD_INTERVAL,
+    // updates the in-memory cache, and notifies the idle-shutdown task via the watch channel.
     {
         let cached = cached_routes.clone();
         let sd = state_dir.clone();
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                if let Ok(s) = RouteStore::new(sd.clone())
-                    && let Ok(routes) = s.load_raw()
-                        && let Ok(mut lock) = cached.write() {
+                tokio::time::sleep(ROUTE_RELOAD_INTERVAL).await;
+                if let Ok(s) = RouteStore::new(sd.clone()) {
+                    // load_raw for display cache (no PID filtering — fast path)
+                    if let Ok(routes) = s.load_raw() {
+                        if let Ok(mut lock) = cached.write() {
                             *lock = routes;
                         }
+                    }
+                    // load with PID filtering for idle-shutdown signal
+                    let alive = s.load(false).unwrap_or_default();
+                    let _ = routes_tx.send(!alive.is_empty());
+                }
             }
         });
     }
+
+    // Idle-shutdown task: waits until `has_routes` is false, then arms a deadline.
+    // If routes come back before the deadline, the timer is cancelled.
+    tokio::spawn(async move {
+        // Grace period: don't shut down before the first app has had time to register.
+        tokio::time::sleep(IDLE_GRACE).await;
+
+        loop {
+            // Wait until routes disappear.
+            if routes_rx.borrow().eq(&true) {
+                if routes_rx.wait_for(|has| !has).await.is_err() {
+                    return; // sender dropped — proxy is shutting down anyway
+                }
+            }
+
+            // Routes are gone; arm the shutdown deadline.
+            let deadline = Instant::now() + IDLE_SHUTDOWN_DELAY;
+            tokio::select! {
+                // Timer fires — still no routes, shut down.
+                _ = tokio::time::sleep_until(deadline) => {
+                    eprintln!("portless proxy: no active routes — shutting down.");
+                    std::process::exit(0);
+                }
+                // A new route appeared before the deadline — disarm and loop.
+                _ = routes_rx.wait_for(|has| *has) => {}
+            }
+        }
+    });
 
     loop {
         let (stream, remote_addr) = listener.accept().await?;
