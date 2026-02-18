@@ -112,13 +112,14 @@ export default defineConfig({
 })
 ```
 
-Then start your app with portless:
+Add portless to your `package.json` scripts:
 
-```bash
-portless myapp npx vite
+```diff
+- "dev": "vite"                    # http://localhost:5173
++ "dev": "portless test01 vite"    # http://test01.localhost:1355
 ```
 
-Your Vite dev server (including HMR) is now available at `http://myapp.localhost:1355`.
+Your Vite dev server (including HMR) is now available at `http://test01.localhost:1355`.
 
 > `host: '0.0.0.0'` is required so that Vite listens on all interfaces and the proxy can reach it. `strictPort: true` prevents Vite from silently picking a different port if the one portless assigned happens to be taken.
 
