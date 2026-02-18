@@ -2,7 +2,7 @@
 name = "portless"
 version = "0.1.0"
 edition = "2024"
-description = "Replace port numbers with stable .localhost URLs for local development"
+description = "Replace port numbers with stable .localhost URLs for local development — built with Rust, only 1MB"
 license = "MIT"
 repository = "https://github.com/lusons/portless-rs"
 homepage = "https://github.com/lusons/portless-rs"

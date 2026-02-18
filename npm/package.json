@@ -1,7 +1,7 @@
 {
   "name": "portless-rs",
   "version": "0.1.9",
-  "description": "Replace port numbers with stable .localhost URLs for local development",
+  "description": "Replace port numbers with stable .localhost URLs for local development — built with Rust, only 1MB",
   "license": "MIT",
   "repository": {
     "type": "git",

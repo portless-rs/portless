@@ -1,6 +1,6 @@
 # portless
 
-Replace port numbers with stable `.localhost` URLs for local development.
+Replace port numbers with stable `.localhost` URLs for local development — built with Rust, only 1MB.
 
 Instead of juggling `localhost:3000`, `localhost:8080`, etc., **portless** gives each app a clean, memorable URL:
 

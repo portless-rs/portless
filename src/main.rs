@@ -26,7 +26,7 @@ use utils::{
 #[derive(Parser)]
 #[command(
     name = "portless",
-    about = "Replace port numbers with stable .localhost URLs for local development"
+    about = "Replace port numbers with stable .localhost URLs for local development — built with Rust, only 1MB"
 )]
 struct Cli {
     #[command(subcommand)]
