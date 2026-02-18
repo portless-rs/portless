@@ -493,17 +493,20 @@ async fn cmd_run(
             _ = sigint.recv() => {
                 forward_signal(child_pid, nix::sys::signal::Signal::SIGINT);
                 let _ = store.remove(&hostname);
+                shutdown_proxy_if_idle(&store, &state_dir);
                 std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGINT));
             }
             _ = sigterm.recv() => {
                 forward_signal(child_pid, nix::sys::signal::Signal::SIGTERM);
                 let _ = store.remove(&hostname);
+                shutdown_proxy_if_idle(&store, &state_dir);
                 std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGTERM));
             }
         }
     };
 
     let _ = store.remove(&hostname);
+    shutdown_proxy_if_idle(&store, &state_dir);
 
     if let Some(status) = exit_status {
         let code = status.code().unwrap_or(1);
@@ -513,6 +516,35 @@ async fn cmd_run(
     }
 
     Ok(())
+}
+
+/// Stop the background proxy if no routes remain after an app exits.
+fn shutdown_proxy_if_idle(store: &RouteStore, state_dir: &PathBuf) {
+    let remaining = store.load(true).unwrap_or_default();
+    if !remaining.is_empty() {
+        return;
+    }
+
+    let pid_path = state_dir.join("proxy.pid");
+    let port_path = state_dir.join("proxy.port");
+
+    let Ok(pid_str) = fs::read_to_string(&pid_path) else {
+        return;
+    };
+    let Ok(pid) = pid_str.trim().parse::<i32>() else {
+        return;
+    };
+
+    if nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(pid),
+        nix::sys::signal::Signal::SIGTERM,
+    )
+    .is_ok()
+    {
+        let _ = fs::remove_file(&pid_path);
+        let _ = fs::remove_file(&port_path);
+        println!("{}", "Proxy stopped (no active routes).".dimmed());
+    }
 }
 
 fn forward_signal(pid: u32, sig: nix::sys::signal::Signal) {
