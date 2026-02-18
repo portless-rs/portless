@@ -84,6 +84,8 @@ Active routes:
 
 ### Manage the proxy
 
+> **Note:** In most cases you don't need to manage the proxy manually — it starts automatically when you run `portless` and stops automatically when all tunnels are closed.
+
 ```bash
 # Start the proxy in the background (daemon)
 portless proxy start
