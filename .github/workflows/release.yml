@@ -142,7 +142,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/portless.rb
           git diff --cached --quiet || git commit -m "chore: update homebrew formula to ${{ env.VERSION }}"
-          git push
+          git push origin HEAD:main
 
   # publish-crates:
   #   name: Publish to crates.io
