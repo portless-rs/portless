@@ -32,6 +32,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sync version from tag into Cargo.toml
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
