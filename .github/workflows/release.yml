@@ -128,33 +128,13 @@ jobs:
           SHA256_ARM=${{ env.SHA256_ARM }}
           SHA256_X64=${{ env.SHA256_X64 }}
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}"
-
-          cat > Formula/portless.rb << EOF
-          class Portless < Formula
-            desc "Replace port numbers with stable .localhost URLs for local development"
-            homepage "https://github.com/${{ github.repository }}"
-            version "${VERSION}"
-            license "MIT"
-
-            on_macos do
-              if Hardware::CPU.arm?
-                url "${BASE_URL}/portless-aarch64-apple-darwin.tar.gz"
-                sha256 "${SHA256_ARM}"
-              else
-                url "${BASE_URL}/portless-x86_64-apple-darwin.tar.gz"
-                sha256 "${SHA256_X64}"
-              end
-            end
-
-            def install
-              bin.install "portless"
-            end
-
-            test do
-              assert_match "portless", shell_output("#{bin}/portless --help")
-            end
-          end
-          EOF
+          sed \
+            -e "s|PLACEHOLDER_VERSION|${VERSION}|g" \
+            -e "s|PLACEHOLDER_BASE_URL|${BASE_URL}|g" \
+            -e "s|PLACEHOLDER_ARM64_SHA256|${SHA256_ARM}|g" \
+            -e "s|PLACEHOLDER_X86_64_SHA256|${SHA256_X64}|g" \
+            Formula/portless.rb > Formula/portless.rb.tmp
+          mv Formula/portless.rb.tmp Formula/portless.rb
 
       - name: Commit and push formula update
         run: |
