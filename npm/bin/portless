@@ -1,0 +1,6 @@
+#!/bin/sh
+# This file is replaced by the real binary during postinstall.
+# If you see this message, postinstall may have failed.
+# Try: npm install -g portless-rs --ignore-scripts && portless-rs-install
+echo "portless binary not installed yet. Run: npm install -g portless-rs" >&2
+exit 1

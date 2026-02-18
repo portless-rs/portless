@@ -1,3 +1,1 @@
-# Ignore the downloaded binary itself — it's placed here at install time
-bin/portless
-bin/portless.exe
+.gitkeep
