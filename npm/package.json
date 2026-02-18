@@ -1,6 +1,6 @@
 {
   "name": "portless-rs",
-  "version": "0.1.1",
+  "version": "0.0.0",
   "description": "Replace port numbers with stable .localhost URLs for local development",
   "license": "MIT",
   "repository": {
