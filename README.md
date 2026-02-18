@@ -107,7 +107,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: Number(process.env.PORT) || 5173,
-    strictPort: true,
   },
 })
 ```
@@ -122,6 +121,19 @@ Add portless to your `package.json` scripts:
 Your Vite dev server (including HMR) is now available at `http://test01.localhost:1355`.
 
 > `host: '0.0.0.0'` is required so that Vite listens on all interfaces and the proxy can reach it. `strictPort: true` prevents Vite from silently picking a different port if the one portless assigned happens to be taken.
+
+### Next.js
+
+Next.js respects the `PORT` environment variable out of the box — no config changes needed.
+
+Add portless to your `package.json` scripts:
+
+```diff
+- "dev": "next dev"                    # http://localhost:3000
++ "dev": "portless myapp next dev"     # http://myapp.localhost:1355
+```
+
+Your Next.js dev server (including Fast Refresh) is now available at `http://myapp.localhost:1355`.
 
 ## Proxy port
 
