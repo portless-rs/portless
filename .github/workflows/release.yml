@@ -186,6 +186,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: "https://registry.npmjs.org"
       - name: Set version in package.json
         working-directory: npm
         run: |
@@ -198,8 +199,6 @@ jobs:
           "
       - name: Publish
         working-directory: npm
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
-          npm publish
+        run: npm publish
         env:
-          NPM_TOKEN: ${{ secrets.NPM_PORTLESS_RS_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PORTLESS_RS_TOKEN }}
