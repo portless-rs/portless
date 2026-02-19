@@ -485,23 +485,21 @@ async fn cmd_run(
     let mut sigint = signal(SignalKind::interrupt())?;
     let mut sigterm = signal(SignalKind::terminate())?;
 
-    let exit_status = loop {
-        tokio::select! {
-            status = child.wait() => {
-                break status.ok();
-            }
-            _ = sigint.recv() => {
-                forward_signal(child_pid, nix::sys::signal::Signal::SIGINT);
-                let _ = store.remove(&hostname);
-                shutdown_proxy_if_idle(&store, &state_dir);
-                std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGINT));
-            }
-            _ = sigterm.recv() => {
-                forward_signal(child_pid, nix::sys::signal::Signal::SIGTERM);
-                let _ = store.remove(&hostname);
-                shutdown_proxy_if_idle(&store, &state_dir);
-                std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGTERM));
-            }
+    let exit_status = tokio::select! {
+        status = child.wait() => {
+            status.ok()
+        }
+        _ = sigint.recv() => {
+            forward_signal(child_pid, nix::sys::signal::Signal::SIGINT);
+            let _ = store.remove(&hostname);
+            shutdown_proxy_if_idle(&store, &state_dir);
+            std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGINT));
+        }
+        _ = sigterm.recv() => {
+            forward_signal(child_pid, nix::sys::signal::Signal::SIGTERM);
+            let _ = store.remove(&hostname);
+            shutdown_proxy_if_idle(&store, &state_dir);
+            std::process::exit(signal_exit_code(nix::sys::signal::Signal::SIGTERM));
         }
     };
 
@@ -519,7 +517,7 @@ async fn cmd_run(
 }
 
 /// Stop the background proxy if no routes remain after an app exits.
-fn shutdown_proxy_if_idle(store: &RouteStore, state_dir: &PathBuf) {
+fn shutdown_proxy_if_idle(store: &RouteStore, state_dir: &std::path::Path) {
     let remaining = store.load(true).unwrap_or_default();
     if !remaining.is_empty() {
         return;

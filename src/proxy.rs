@@ -55,10 +55,10 @@ pub async fn run_proxy(port: u16, state_dir: PathBuf) -> Result<()> {
                 tokio::time::sleep(ROUTE_RELOAD_INTERVAL).await;
                 if let Ok(s) = RouteStore::new(sd.clone()) {
                     // load_raw for display cache (no PID filtering — fast path)
-                    if let Ok(routes) = s.load_raw() {
-                        if let Ok(mut lock) = cached.write() {
-                            *lock = routes;
-                        }
+                    if let Ok(routes) = s.load_raw()
+                        && let Ok(mut lock) = cached.write()
+                    {
+                        *lock = routes;
                     }
                     // load with PID filtering for idle-shutdown signal
                     let alive = s.load(false).unwrap_or_default();
@@ -76,10 +76,10 @@ pub async fn run_proxy(port: u16, state_dir: PathBuf) -> Result<()> {
 
         loop {
             // Wait until routes disappear.
-            if routes_rx.borrow().eq(&true) {
-                if routes_rx.wait_for(|has| !has).await.is_err() {
-                    return; // sender dropped — proxy is shutting down anyway
-                }
+            if routes_rx.borrow().eq(&true)
+                && routes_rx.wait_for(|has| !has).await.is_err()
+            {
+                return; // sender dropped — proxy is shutting down anyway
             }
 
             // Routes are gone; arm the shutdown deadline.

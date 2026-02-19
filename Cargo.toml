@@ -9,6 +9,18 @@ homepage = "https://github.com/lusons/portless-rs"
 keywords = ["proxy", "localhost", "dev", "tunnel", "port"]
 categories = ["command-line-utilities", "development-tools", "network-programming"]
 
+[lints.rust]
+future-incompatible = { level = "warn", priority = 1 }
+nonstandard_style = { level = "deny", priority = 2 }
+
+[lints.clippy]
+# High priority performance and correctness lints
+redundant_clone = { level = "deny", priority = 10 }
+needless_collect = { level = "deny", priority = 9 }
+large_enum_variant = { level = "warn", priority = 8 }
+clone_on_copy = { level = "deny", priority = 7 }
+unnecessary_wraps = { level = "warn", priority = 6 }
+
 [[bin]]
 name = "portless"
 path = "src/main.rs"
