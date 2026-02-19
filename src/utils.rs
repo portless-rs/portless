@@ -230,3 +230,170 @@ pub fn find_pid_on_port(port: u16) -> Option<u32> {
     let s = String::from_utf8_lossy(&output.stdout);
     s.trim().lines().next()?.trim().parse().ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signal_exit_code() {
+        use nix::sys::signal::Signal::*;
+        assert_eq!(signal_exit_code(SIGINT), 130); // 128 + 2
+        assert_eq!(signal_exit_code(SIGTERM), 143); // 128 + 15
+        assert_eq!(signal_exit_code(SIGHUP), 129); // 128 + 1
+        assert_eq!(signal_exit_code(SIGKILL), 137); // 128 + 9
+    }
+
+    #[test]
+    fn test_resolve_state_dir_privileged() {
+        let dir = resolve_state_dir(80);
+        assert_eq!(dir, PathBuf::from("/tmp/portless"));
+    }
+
+    #[test]
+    fn test_resolve_state_dir_user_level() {
+        let dir = resolve_state_dir(1355);
+        let expected = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join(".portless");
+        assert_eq!(dir, expected);
+    }
+
+    #[test]
+    fn test_format_url_standard_port() {
+        assert_eq!(format_url("test.localhost", 1355), "http://test.localhost:1355");
+        assert_eq!(format_url("app.localhost", 3000), "http://app.localhost:3000");
+    }
+
+    #[test]
+    fn test_format_url_port_80() {
+        assert_eq!(format_url("test.localhost", 80), "http://test.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_simple() {
+        assert_eq!(parse_hostname("test").unwrap(), "test.localhost");
+        assert_eq!(parse_hostname("myapp").unwrap(), "myapp.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_with_localhost() {
+        assert_eq!(parse_hostname("test.localhost").unwrap(), "test.localhost");
+        assert_eq!(parse_hostname("my-app.localhost").unwrap(), "my-app.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_with_protocol() {
+        assert_eq!(parse_hostname("http://test").unwrap(), "test.localhost");
+        assert_eq!(parse_hostname("https://test").unwrap(), "test.localhost");
+        assert_eq!(parse_hostname("http://test.localhost").unwrap(), "test.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_with_path() {
+        assert_eq!(parse_hostname("test/path").unwrap(), "test.localhost");
+        assert_eq!(parse_hostname("http://test/path/to/resource").unwrap(), "test.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_case_insensitive() {
+        assert_eq!(parse_hostname("MyApp").unwrap(), "myapp.localhost");
+        assert_eq!(parse_hostname("TEST").unwrap(), "test.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_with_hyphens() {
+        assert_eq!(parse_hostname("my-app").unwrap(), "my-app.localhost");
+        assert_eq!(parse_hostname("test-123").unwrap(), "test-123.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_with_dots() {
+        assert_eq!(parse_hostname("sub.domain").unwrap(), "sub.domain.localhost");
+    }
+
+    #[test]
+    fn test_parse_hostname_empty() {
+        assert!(parse_hostname("").is_err());
+        assert!(parse_hostname("  ").is_err());
+        assert!(parse_hostname(".localhost").is_err());
+    }
+
+    #[test]
+    fn test_parse_hostname_consecutive_dots() {
+        assert!(parse_hostname("test..app").is_err());
+        assert!(parse_hostname("..test").is_err());
+    }
+
+    #[test]
+    fn test_parse_hostname_invalid_characters() {
+        assert!(parse_hostname("test_app").is_err()); // underscore not allowed
+        assert!(parse_hostname("test@app").is_err());
+        assert!(parse_hostname("test app").is_err()); // space not allowed
+    }
+
+    #[test]
+    fn test_parse_hostname_invalid_start_end() {
+        assert!(parse_hostname("-test").is_err()); // cannot start with hyphen
+        assert!(parse_hostname("test-").is_err()); // cannot end with hyphen
+        assert!(parse_hostname(".test").is_err()); // cannot start with dot
+    }
+
+    #[test]
+    fn test_escape_html() {
+        assert_eq!(escape_html("hello"), "hello");
+        assert_eq!(escape_html("<script>"), "&lt;script&gt;");
+        assert_eq!(escape_html("a & b"), "a &amp; b");
+        assert_eq!(escape_html("\"quotes\""), "&quot;quotes&quot;");
+        assert_eq!(escape_html("'single'"), "&#39;single&#39;");
+        assert_eq!(
+            escape_html("<div class=\"test\">a & b</div>"),
+            "&lt;div class=&quot;test&quot;&gt;a &amp; b&lt;/div&gt;"
+        );
+    }
+
+    #[test]
+    fn test_find_free_port() {
+        let port = find_free_port().unwrap();
+        assert!(port >= MIN_APP_PORT);
+        assert!(port <= MAX_APP_PORT);
+    }
+
+    #[test]
+    fn test_is_port_free() {
+        // Bind to a random port to test
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let port = addr.port();
+
+        // Port should not be free while listener is bound
+        assert!(!is_port_free(port));
+
+        // Drop listener
+        drop(listener);
+
+        // Port should be free now (may be flaky due to TIME_WAIT, but generally works)
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(is_port_free(port));
+    }
+
+    #[test]
+    fn test_get_default_port() {
+        // Test default value when env var is not set
+        unsafe { std::env::remove_var("PORTLESS_PORT") };
+        assert_eq!(get_default_port(), DEFAULT_PROXY_PORT);
+
+        // Test custom value from env var
+        unsafe { std::env::set_var("PORTLESS_PORT", "8080") };
+        assert_eq!(get_default_port(), 8080);
+
+        // Cleanup
+        unsafe { std::env::remove_var("PORTLESS_PORT") };
+    }
+
+    #[test]
+    fn test_is_proxy_running_no_server() {
+        // Test with a port that's definitely not running
+        assert!(!is_proxy_running(65534));
+    }
+}

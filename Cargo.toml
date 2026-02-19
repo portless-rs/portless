@@ -21,6 +21,10 @@ large_enum_variant = { level = "warn", priority = 8 }
 clone_on_copy = { level = "deny", priority = 7 }
 unnecessary_wraps = { level = "warn", priority = 6 }
 
+[lib]
+name = "portless"
+path = "src/lib.rs"
+
 [[bin]]
 name = "portless"
 path = "src/main.rs"
@@ -38,3 +42,7 @@ rand = "0.9"
 colored = "2"
 nix = { version = "0.29", features = ["signal", "process"] }
 anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
