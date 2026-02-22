@@ -3,16 +3,16 @@
 class Portless < Formula
   desc "Replace port numbers with stable .localhost URLs for local development — built with Rust, only 1MB"
   homepage "https://github.com/portless-rs/portless"
-  version "0.1.14"
+  version "0.1.15"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/portless-rs/portless/releases/download/v0.1.14/portless-aarch64-apple-darwin.tar.gz"
-      sha256 "376f8b8f9cd7dc8551db3efe7b611cc153676ed7ad22856a28ed650988424d58"
+      url "https://github.com/portless-rs/portless/releases/download/v0.1.15/portless-aarch64-apple-darwin.tar.gz"
+      sha256 "f213d7026d707bb21c7b7efd169b0b6785349b8cfe9d907c13afbafacb7dd09a"
     else
-      url "https://github.com/portless-rs/portless/releases/download/v0.1.14/portless-x86_64-apple-darwin.tar.gz"
-      sha256 "bb5fecfb10c08ca41879a6708d52115258c723322b86947f02e1fd17aff86f81"
+      url "https://github.com/portless-rs/portless/releases/download/v0.1.15/portless-x86_64-apple-darwin.tar.gz"
+      sha256 "6bf2a2bde881e02793be63f8558093a164f4181fbd131a30eff714144954f50d"
     end
   end
 
