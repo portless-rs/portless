@@ -373,7 +373,7 @@ fn cmd_list(state_dir: PathBuf, proxy_port: u16) -> Result<()> {
 
 async fn cmd_run(
     name: String,
-    cmd: Vec<String>,
+    mut cmd: Vec<String>,
     proxy_port: u16,
     state_dir: PathBuf,
 ) -> Result<()> {
@@ -459,10 +459,13 @@ async fn cmd_run(
         pid: my_pid,
     })?;
 
+    // Inject --port / --host flags for frameworks that ignore the PORT env var
+    inject_framework_flags(&mut cmd, port);
+
     println!("{}", format!("\n  -> {}\n", app_url).cyan().bold());
     println!(
         "{}",
-        format!("Running: PORT={} {}\n", port, cmd.join(" ")).dimmed()
+        format!("Running: PORT={} HOST=127.0.0.1 {}\n", port, cmd.join(" ")).dimmed()
     );
 
     let program = cmd[0].clone();
@@ -471,6 +474,8 @@ async fn cmd_run(
     let mut child = TokioCommand::new(&program)
         .args(args)
         .env("PORT", port.to_string())
+        .env("HOST", "127.0.0.1")
+        .env("__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS", ".localhost")
         .spawn()
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -579,6 +584,48 @@ fn run_passthrough(cmd: &[String]) -> Result<()> {
         std::process::exit(status.code().unwrap_or(1));
     }
     Ok(())
+}
+
+/// Frameworks that ignore the `PORT` env var and need explicit CLI flags.
+/// `strict_port` controls whether `--strictPort` is appended (prevents the
+/// framework from silently picking a different port).
+///
+/// SvelteKit is not listed because its dev server is Vite under the hood,
+/// so the `vite` entry already covers it.
+struct FrameworkFlags {
+    strict_port: bool,
+}
+
+fn inject_framework_flags(cmd: &mut Vec<String>, port: u16) {
+    let frameworks: &[(&str, FrameworkFlags)] = &[
+        ("vite", FrameworkFlags { strict_port: true }),
+        ("react-router", FrameworkFlags { strict_port: true }),
+        ("astro", FrameworkFlags { strict_port: false }),
+        ("ng", FrameworkFlags { strict_port: false }),
+    ];
+
+    let Some(program) = cmd.first() else { return };
+    let basename = std::path::Path::new(program)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(program.as_str());
+
+    let Some(flags) = frameworks.iter().find(|(name, _)| *name == basename).map(|(_, f)| f) else {
+        return;
+    };
+
+    if !cmd.contains(&"--port".to_string()) {
+        cmd.push("--port".to_string());
+        cmd.push(port.to_string());
+        if flags.strict_port {
+            cmd.push("--strictPort".to_string());
+        }
+    }
+
+    if !cmd.contains(&"--host".to_string()) {
+        cmd.push("--host".to_string());
+        cmd.push("127.0.0.1".to_string());
+    }
 }
 
 fn prompt(question: &str) -> String {

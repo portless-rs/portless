@@ -67,7 +67,8 @@ The codebase is split into five modules:
   - Parses commands via `clap`
   - Handles `portless <name> <cmd>`, `portless proxy start/stop`, `portless list`
   - Auto-starts the proxy if not running
-  - Registers routes, spawns child processes with `$PORT` set
+  - Detects framework from command basename, injects `--port`/`--host` flags for Vite, React Router, Astro, Angular
+  - Registers routes, spawns child processes with `$PORT`, `HOST`, `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` set
   - Forwards SIGINT/SIGTERM to children and cleans up routes
   - Auto-stops proxy when last route exits (via `shutdown_proxy_if_idle`)
 
@@ -169,6 +170,8 @@ git push origin v0.1.12
 - `PORTLESS_STATE_DIR`: Override state directory (`~/.portless`)
 - `PORTLESS`: Set to `0` or `skip` to bypass portless (runs command directly)
 - `PORT`: Injected into child processes by portless (auto-assigned from 4000-4999)
+- `HOST`: Injected as `127.0.0.1` so frameworks bind IPv4 and the proxy can reach them
+- `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS`: Injected as `.localhost` so Vite's dev server accepts `.localhost` requests
 
 ## Security Notes
 

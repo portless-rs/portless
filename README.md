@@ -97,47 +97,34 @@ portless proxy stop
 portless proxy start --foreground
 ```
 
-## Framework examples
+## Framework support
 
-### Vite
+No configuration changes are needed — just wrap your existing dev command with `portless <name>`.
 
-Configure Vite to read the port from the `PORT` environment variable that portless injects:
+portless automatically injects the right flags for frameworks that don't read `$PORT`, and sets `HOST=127.0.0.1` for all processes so the proxy can always reach them.
 
-```ts
-// vite.config.ts
-import { defineConfig } from 'vite'
+| Framework | How it works |
+|---|---|
+| **Vite** (incl. SvelteKit) | `--port`, `--strictPort`, `--host 127.0.0.1` injected automatically |
+| **React Router** | `--port`, `--strictPort`, `--host 127.0.0.1` injected automatically |
+| **Astro** | `--port`, `--host 127.0.0.1` injected automatically |
+| **Angular** (`ng`) | `--port`, `--host 127.0.0.1` injected automatically |
+| **Next.js** | reads `$PORT` natively — no flags needed |
+| **Nuxt** | reads `$PORT` natively — no flags needed |
+| **Express / Node.js** | reads `$PORT` natively — no flags needed |
 
-export default defineConfig({
-  server: {
-    host: '0.0.0.0',
-    port: Number(process.env.PORT) || 5173,
-  },
-})
-```
-
-Add portless to your `package.json` scripts:
+**Examples:**
 
 ```diff
-- "dev": "vite"                    # http://localhost:5173
-+ "dev": "portless test01 vite"    # http://test01.localhost:1355
-```
+- "dev": "vite"                        # http://localhost:5173
++ "dev": "portless myapp vite"         # http://myapp.localhost:1355
 
-Your Vite dev server (including HMR) is now available at `http://test01.localhost:1355`.
-
-> `host: '0.0.0.0'` is required so that Vite listens on all interfaces and the proxy can reach it. `strictPort: true` prevents Vite from silently picking a different port if the one portless assigned happens to be taken.
-
-### Next.js
-
-Next.js respects the `PORT` environment variable out of the box — no config changes needed.
-
-Add portless to your `package.json` scripts:
-
-```diff
 - "dev": "next dev"                    # http://localhost:3000
 + "dev": "portless myapp next dev"     # http://myapp.localhost:1355
-```
 
-Your Next.js dev server (including Fast Refresh) is now available at `http://myapp.localhost:1355`.
+- "dev": "astro dev"                   # http://localhost:4321
++ "dev": "portless myapp astro dev"    # http://myapp.localhost:1355
+```
 
 ## Proxy port
 
@@ -163,12 +150,14 @@ PORTLESS=0 portless myapp npm run dev
 
 ## Environment variables
 
-| Variable             | Description                                         | Default         |
-|----------------------|-----------------------------------------------------|-----------------|
-| `PORTLESS_PORT`      | Proxy port                                          | `1355`          |
-| `PORTLESS_STATE_DIR` | Directory for PID file, route list, and proxy log   | `~/.portless`   |
-| `PORTLESS`           | Set to `0` or `skip` to bypass portless             | —               |
-| `PORT`               | Injected into child processes by portless           | auto-assigned   |
+| Variable                               | Description                                         | Default         |
+|----------------------------------------|-----------------------------------------------------|-----------------|
+| `PORTLESS_PORT`                        | Proxy port                                          | `1355`          |
+| `PORTLESS_STATE_DIR`                   | Directory for PID file, route list, and proxy log   | `~/.portless`   |
+| `PORTLESS`                             | Set to `0` or `skip` to bypass portless             | —               |
+| `PORT`                                 | Injected into child processes — the assigned port   | auto-assigned   |
+| `HOST`                                 | Injected into child processes — always `127.0.0.1`  | `127.0.0.1`     |
+| `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS` | Injected so Vite accepts `.localhost` requests    | `.localhost`    |
 
 ## State files
 
