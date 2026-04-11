@@ -5,9 +5,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lusons/portless-rs.git"
+    "url": "https://github.com/portless-rs/portless"
   },
-  "homepage": "https://github.com/lusons/portless-rs",
+  "homepage": "https://github.com/portless-rs/portless",
   "keywords": [
     "portless",
     "portless-rs",
